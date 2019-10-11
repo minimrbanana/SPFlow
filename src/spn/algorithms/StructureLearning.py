@@ -282,6 +282,8 @@ def learn_structure(
                     local_tasks.append(len(node.children) - 1)
                     child_data_slice = data_slicer(local_data, [col], num_conditional_cols)
                     local_children_params.append((child_data_slice, ds_context, [scope[col]]))
+
+                result_nodes = pool.starmap(create_leaf, local_children_params)
             # 2. if is_pair=True and #scope>1, the factorization ends with pairs of coefs
             else:
                 for col in range(len(scope)):
