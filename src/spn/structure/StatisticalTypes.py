@@ -22,7 +22,8 @@ class Type(Enum):
     CATEGORICAL = (4, MetaType.DISCRETE)
     ORDINAL = (5, MetaType.DISCRETE)
     COUNT = (6, MetaType.DISCRETE)
-    BINARY = (7, MetaType.BINARY)
+    # BINARY = (7, MetaType.BINARY)
+    BINARY = (7, MetaType.DISCRETE)
 
     def __init__(self, enum_val, meta_type):
         self._enum_val = enum_val

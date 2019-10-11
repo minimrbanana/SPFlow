@@ -121,7 +121,10 @@ def learn_structure(
     create_leaf,
     next_operation=get_next_operation(),
     initial_scope=None,
+    num_conditional_cols=None,
     data_slicer=default_slicer,
+    l_rfft=None,
+    is_pair=False,
 ):
     assert dataset is not None
     assert ds_context is not None
@@ -135,19 +138,22 @@ def learn_structure(
 
     if initial_scope is None:
         initial_scope = list(range(dataset.shape[1]))
-        num_conditional_cols = None
-    elif len(initial_scope) < dataset.shape[1]:
-        num_conditional_cols = dataset.shape[1] - len(initial_scope)
-    else:
-        num_conditional_cols = None
-        assert len(initial_scope) > dataset.shape[1], "check initial scope: %s" % initial_scope
+        ## num_conditional_cols = None
+    ## elif len(initial_scope) < dataset.shape[1]:
+        ## num_conditional_cols = dataset.shape[1] - len(initial_scope)
+    ## else:
+        ## num_conditional_cols = None
+        ## assert len(initial_scope) > dataset.shape[1], "check initial scope: %s" % initial_scope
 
     tasks = deque()
-    tasks.append((dataset, root, 0, initial_scope, False, False))
+
+    ## tasks.append((dataset, root, 0, initial_scope, False, False))
+    tasks.append((default_slicer(dataset, initial_scope), root, 0, initial_scope, False, False))
 
     while tasks:
 
         local_data, parent, children_pos, scope, no_clusters, no_independencies = tasks.popleft()
+        assert(local_data.shape[1]==len(scope))
 
         operation, op_params = next_operation(
             local_data,
@@ -235,7 +241,7 @@ def learn_structure(
 
         elif operation == Operation.SPLIT_COLUMNS:
             split_start_t = perf_counter()
-            data_slices = split_cols(local_data, ds_context, scope)
+            data_slices = split_cols(local_data, ds_context, scope, l_rfft, is_pair)
             split_end_t = perf_counter()
             logging.debug(
                 "\t\tfound {} col clusters (in {:.5f} secs)".format(len(data_slices), split_end_t - split_start_t)
@@ -267,14 +273,34 @@ def learn_structure(
             local_tasks = []
             local_children_params = []
             split_start_t = perf_counter()
-            for col in range(len(scope)):
-                node.children.append(None)
-                # tasks.append((data_slicer(local_data, [col], num_conditional_cols), node, len(node.children) - 1, [scope[col]], True, True))
-                local_tasks.append(len(node.children) - 1)
-                child_data_slice = data_slicer(local_data, [col], num_conditional_cols)
-                local_children_params.append((child_data_slice, ds_context, [scope[col]]))
+            # modified by zhongjie on 04.10.2019
+            # 1. if is_pair=False or #scope=1, the factorization ends with univariate Gaussian
+            if not is_pair or len(scope)==1:
+                for col in range(len(scope)):
+                    node.children.append(None)
+                    # tasks.append((data_slicer(local_data, [col], num_conditional_cols), node, len(node.children) - 1, [scope[col]], True, True))
+                    local_tasks.append(len(node.children) - 1)
+                    child_data_slice = data_slicer(local_data, [col], num_conditional_cols)
+                    local_children_params.append((child_data_slice, ds_context, [scope[col]]))
+            # 2. if is_pair=True and #scope>1, the factorization ends with pairs of coefs
+            else:
+                for col in range(len(scope)):
+                    # consider only the real part of coef
+                    if l_rfft-1 > scope[col] % (l_rfft * 2) > 0:
+                        node.children.append(None)
+                        local_tasks.append(len(node.children) - 1)
+                        # pair of coefs
+                        child_data_slice = data_slicer(local_data, [col, scope.index(scope[col]+l_rfft)], num_conditional_cols)
+                        local_children_params.append((child_data_slice, ds_context, [scope[col], scope[col]+l_rfft]))
+                    # if it is freq 0 or freq \pi, which has no imag part
+                    elif scope[col] % (l_rfft * 2)==0 or scope[col] % (l_rfft * 2)==l_rfft-1:
+                        node.children.append(None)
+                        # tasks.append((data_slicer(local_data, [col], num_conditional_cols), node, len(node.children) - 1, [scope[col]], True, True))
+                        local_tasks.append(len(node.children) - 1)
+                        child_data_slice = data_slicer(local_data, [col], num_conditional_cols)
+                        local_children_params.append((child_data_slice, ds_context, [scope[col]]))
 
-            result_nodes = pool.starmap(create_leaf, local_children_params)
+                result_nodes = pool.starmap(create_leaf, local_children_params)
             # result_nodes = []
             # for l in tqdm(local_children_params):
             #    result_nodes.append(create_leaf(*l))

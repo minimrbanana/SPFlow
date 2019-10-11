@@ -203,6 +203,7 @@ def rdc_transformer(
             features.append(ohe_data(local_data[:, f], domains[f]))
         else:
             features.append(local_data[:, f].reshape(-1, 1))
+        ## features.append(local_data[:, f].reshape(-1, 1))
     # else:
     #     features = [data_slice.getFeatureData(f) for f in range(D)]
 
@@ -280,8 +281,9 @@ def rdc_test(local_data, meta_types, domains, k=None, s=1.0 / 6.0, non_linearity
 
 
 def getIndependentRDCGroups_py(
-    local_data, threshold, meta_types, domains, k=None, s=1.0 / 6.0, non_linearity=np.sin, n_jobs=-2, rand_gen=None
+    local_data, threshold, meta_types, domains, scope, l_rfft=None, is_pair=False, k=None, s=1.0 / 6.0, non_linearity=np.sin, n_jobs=-2, rand_gen=None
 ):
+    # modified by zhongjie on 04.10.2019, byu adding scope and keepComplexPairs
     rdc_adjacency_matrix = rdc_test(
         local_data, meta_types, domains, k=k, s=s, non_linearity=non_linearity, n_jobs=n_jobs, rand_gen=rand_gen
     )
@@ -291,6 +293,23 @@ def getIndependentRDCGroups_py(
     #
     rdc_adjacency_matrix[np.isnan(rdc_adjacency_matrix)] = 0
     n_features = local_data.shape[1]
+
+    #
+    # Add function to keep correlation between real and imag coefficients.
+    # rdc_adjacency_matrix = keepComplexPairs(rdc_adjacency_matrix, scope)
+    if is_pair:
+        assert(l_rfft is not None)
+        for s_real in scope:
+            # select scope that belongs to the REAL part.
+            if l_rfft-1 > s_real % (l_rfft * 2) > 0:
+                # keep the real and imag coefs connected
+                index_real = scope.index(s_real)
+                index_imag = scope.index(s_real+l_rfft)
+                rdc_adjacency_matrix[index_real, index_imag] = 1
+                rdc_adjacency_matrix[index_imag, index_real] = 1
+        rdc_adjacency_matrix[rdc_adjacency_matrix < 0.84] = 0
+        # rdc_adjacency_matrix[rdc_adjacency_matrix < threshold] = 0
+    #
 
     #
     # thresholding
@@ -307,15 +326,20 @@ def getIndependentRDCGroups_py(
 
 
 def get_split_cols_RDC_py(threshold=0.3, ohe=True, k=10, s=1 / 6, non_linearity=np.sin, n_jobs=-2, rand_gen=None):
-    def split_cols_RDC_py(local_data, ds_context, scope):
+    def split_cols_RDC_py(local_data, ds_context, scope, l_rfft=None, is_pair=False):
         meta_types = ds_context.get_meta_types_by_scope(scope)
         domains = ds_context.get_domains_by_scope(scope)
+        ### by zhongjie
+        # local_data = local_data[:, scope]
 
         clusters = getIndependentRDCGroups_py(
             local_data,
             threshold,
             meta_types,
             domains,
+            scope,
+            l_rfft,
+            is_pair,
             k=k,
             s=s,
             # ohe=True,

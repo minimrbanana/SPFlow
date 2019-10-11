@@ -1,8 +1,8 @@
 """
-Created on May 14, 2019
+Created on April 15, 2018
 
 @author: Alejandro Molina
-@author: Zhongjie Yu
+@author: Antonio Vergari
 """
 from spn.algorithms.Sampling import add_leaf_sampling
 from spn.structure.leaves.histogram.Histograms import (
@@ -21,6 +21,7 @@ def sample_histogram_node(node, n_samples, data, rand_gen):
     assert isinstance(node, Histogram)
     assert n_samples > 0
     # sample the value at each bin according to the densities of each bin
+    # print(len(node.bin_repr_points))
     X = rand_gen.choice(np.array(node.bin_repr_points), p=node.densities, size=n_samples)
 
     return X

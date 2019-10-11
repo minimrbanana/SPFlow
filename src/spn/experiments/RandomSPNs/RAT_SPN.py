@@ -6,6 +6,7 @@ import spn.structure.leaves.parametric.Parametric as para
 from tensorflow.python.ops import math_ops
 from tensorflow.python.ops import random_ops
 import tensorflow.contrib.distributions as dists
+import tensorflow_probability.python.distributions as tpd
 
 import time
 
@@ -78,6 +79,113 @@ class SpnArgs(object):
         self.leaf = "gaussian"  # NOTE maybe we can use something more elegant here, eg. SPFlow classes
 
 
+class Gauss2dVector(NodeVector):
+    def __init__(self, region, args, name, given_means=None, given_stddevs=None, mean=0.0):
+        super().__init__(name)
+        self.local_size = len(region)
+        self.args = args
+        self.scope = sorted(list(region))
+        self.size = args.num_univ_distros
+
+        self.means = variable_with_weight_decay(
+            name + "_means",
+            # 1d version
+            #  shape=[1, self.local_size, args.num_univ_distros],
+            # ------
+            shape=[1, self.local_size, args.num_univ_distros, 2],
+            stddev=1e-1,
+            mean=mean,
+            wd=args.gauss_param_l2,
+            values=given_means,
+        )
+        if args.gauss_min_var < args.gauss_max_var:
+            self.sigma_params = variable_with_weight_decay(
+                name + "_sigma_params",
+                # 1d version
+                # shape=[1, self.local_size, args.num_univ_distros],
+                # ------
+                shape=[1, self.local_size, args.num_univ_distros, 2],
+                stddev=1e-1,
+                wd=args.gauss_param_l2,
+                values=given_stddevs,
+            )
+            self.sigma = args.gauss_min_var + (args.gauss_max_var - args.gauss_min_var) * tf.sigmoid(self.sigma_params)
+            self.cholesky_param = variable_with_weight_decay(
+                name + "_cholesky_param",
+                shape=[1, self.local_size, args.num_univ_distros],
+                stddev=1e-1,
+                mean=mean,
+                wd=args.gauss_param_l2,
+                values=given_means,
+            )
+        else:
+            self.sigma = 1.0
+        """
+        # build the covariance matrix form the cholesky matrix
+        cholesky00 = tf.reshape(self.sigma[:, :, :, 0], (1, -1, 20, 1, 1))
+        cholesky11 = tf.reshape(self.sigma[:, :, :, 1], (1, -1, 20, 1, 1))
+        cholesky01 = tf.zeros_like(cholesky00)
+        cholesky10 = tf.reshape(self.cholesky_param, (1, -1, 20, 1, 1))
+        choleskyL0 = tf.concat([cholesky00, cholesky01], 4)
+        choleskyL1 = tf.concat([cholesky10, cholesky11], 4)
+        choleskyL_ = tf.concat([choleskyL0, choleskyL1], 3)
+        self.choleskyL = tf.reshape(choleskyL_, (-1, 2, 2))
+        cholesky70 = tf.concat([cholesky00, cholesky10], 4)
+        cholesky71 = tf.concat([cholesky01, cholesky11], 4)
+        cholesky7_ = tf.concat([cholesky70, cholesky71], 3)
+        self.cholesky7 = tf.reshape(cholesky7_, (-1, 2, 2))
+        self.cov_mat = tf.reshape(tf.matmul(self.choleskyL, self.cholesky7), (1, -1, 20, 2, 2))
+        # 2d gaussian with covariance matrix here
+        # self.dist = tpd.MultivariateNormalFullCovariance(self.means, self.cov_mat)
+        """
+        # 2d gaussian with diagonal matrix here
+        self.dist = dists.MultivariateNormalDiag(self.means, self.sigma)
+        # self.dist = dists.MultivariateNormalDiag(self.means, tf.sqrt(self.sigma))
+
+
+    def forward(self, inputs, marginalized=None):
+        # choose the corresponding scope as the input: ==> inputs[self.scope]
+        local_inputs = tf.gather(inputs, self.scope, axis=1)
+        # gauss_log_pdf_single = - 0.5 * (tf.expand_dims(local_inputs, -1) - self.means) ** 2 / self.sigma \
+        #                        - tf.log(tf.sqrt(2 * np.pi * self.sigma))
+        # 1d version
+        #  gauss_log_pdf_single = self.dist.log_prob(tf.expand_dims(local_inputs, axis=-1))
+        # ------ the last dim is always for the 2d gaussian, so add one dim to the -2 dim instead of -1
+        gauss_log_pdf_2d = self.dist.log_prob(tf.expand_dims(local_inputs, axis=-2))
+
+        if marginalized is not None:
+            marginalized = tf.clip_by_value(marginalized, 0.0, 1.0)
+            # 1d version
+            local_marginalized = tf.expand_dims(tf.gather(marginalized, self.scope, axis=1), axis=-1)
+            # ------ do not need to expand dim
+            #  local_marginalized = tf.gather(marginalized, self.scope, axis=1)
+            # weighted_gauss_pdf = (1 - local_marginalized) * tf.exp(gauss_log_pdf_single)
+            # local_marginalized_broadcast = local_marginalized * tf.ones_like(weighted_gauss_pdf)
+
+            # stacked = tf.stack([weighted_gauss_pdf, local_marginalized_broadcast], axis=3)
+            # gauss_log_pdf_single = tf.log(weighted_gauss_pdf + local_marginalized_broadcast)
+            gauss_log_pdf_2d = gauss_log_pdf_2d * (1 - local_marginalized)
+
+        gauss_log_pdf = tf.reduce_sum(gauss_log_pdf_2d, 1)
+        return gauss_log_pdf
+
+    def sample(self, num_samples, num_dims, seed=None):
+        # sample_values = self.dist.sample([num_samples], seed=seed)[:, 0]
+        sample_values = self.means + tf.zeros([num_samples, self.local_size, self.args.num_univ_distros])
+        sample_shape = [num_samples, num_dims, self.size]
+        indices = tf.meshgrid(tf.range(num_samples), self.scope, tf.range(self.size))
+        indices = tf.stack(indices, axis=-1)
+        indices = tf.transpose(indices, [1, 0, 2, 3])
+        samples = tf.scatter_nd(indices, sample_values, sample_shape)
+        return samples
+
+    def num_params(self):
+        result = self.means.shape.num_elements()
+        if isinstance(self.sigma, tf.Tensor):
+            result += self.sigma.shape.num_elements()
+        return result
+
+
 class GaussVector(NodeVector):
     def __init__(self, region, args, name, given_means=None, given_stddevs=None, mean=0.0):
         super().__init__(name)
@@ -117,7 +225,8 @@ class GaussVector(NodeVector):
         else:
             self.sigma = 1.0
 
-        self.dist = dists.Normal(self.means, tf.sqrt(self.sigma))
+        # self.dist = dists.Normal(self.means, tf.sqrt(self.sigma))
+        self.dist = dists.Normal(self.means, self.sigma)
 
     def forward(self, inputs, marginalized=None):
         local_inputs = tf.gather(inputs, self.scope, axis=1)
@@ -234,7 +343,8 @@ class ProductVector(NodeVector):
             # product == sum in log-domain
             prod = dists1_expand + dists2_expand
             # flatten out the outer product
-            prod = tf.reshape(prod, [dists1.shape[0], num_dist1 * num_dist2])
+            # change first dim to -1 to make batch size work
+            prod = tf.reshape(prod, [-1, num_dist1 * num_dist2])
 
         return prod
 
@@ -384,7 +494,7 @@ class RatSpn(object):
                         sess.run(init_new_vars_op)
                         self.vector_list[0].append(bernoulli_vector)
                         node_to_vec[id(a_node)] = bernoulli_vector
-                    else:
+                    elif self.args.leaf == "gaussian":
                         name = "gauss_{}_{}".format(i, k)
                         gauss_vector = GaussVector(
                             scope,
@@ -399,6 +509,21 @@ class RatSpn(object):
                         sess.run(init_new_vars_op)
                         self.vector_list[0].append(gauss_vector)
                         node_to_vec[id(a_node)] = gauss_vector
+                    else:
+                        name = "gauss2d_{}_{}".format(i, k)
+                        gauss2d_vector = Gauss2dVector(
+                            scope,
+                            self.args,
+                            name,
+                            given_means=a_node.means.eval(session=sess),
+                            given_stddevs=a_node.sigma_params.eval(session=sess),
+                        )
+                        init_new_vars_op = tf.initializers.variables(
+                            [gauss2d_vector.means, gauss2d_vector.sigma_params], name="init"
+                        )
+                        sess.run(init_new_vars_op)
+                        self.vector_list[0].append(gauss2d_vector)
+                        node_to_vec[id(a_node)] = gauss2d_vector
 
         for layer_num, layer in enumerate(vector_list[1:]):
             self.vector_list.append([])
@@ -441,11 +566,16 @@ class RatSpn(object):
                 bernoulli_vector = BernoulliVector(leaf_region, self.args, name, p=self.default_param)
                 self.vector_list[-1].append(bernoulli_vector)
                 self._region_distributions[leaf_region] = bernoulli_vector
-            else:
+            elif self.args.leaf == "gaussian":
                 name = "gauss_{}".format(i)
                 gauss_vector = GaussVector(leaf_region, self.args, name, mean=self.default_mean)
                 self.vector_list[-1].append(gauss_vector)
                 self._region_distributions[leaf_region] = gauss_vector
+            else:
+                name = "gauss2d_{}".format(i)
+                gauss2d_vector = Gauss2dVector(leaf_region, self.args, name, mean=self.default_mean)
+                self.vector_list[-1].append(gauss2d_vector)
+                self._region_distributions[leaf_region] = gauss2d_vector
 
         # make sum-product layers
         ps_count = 0
@@ -520,6 +650,8 @@ class RatSpn(object):
         for leaf_vector in self.vector_list[0]:
             if type(leaf_vector) == GaussVector:
                 vec_to_params[leaf_vector] = (leaf_vector.means[0], leaf_vector.sigma[0])
+            elif type(leaf_vector) == Gauss2dVector:
+                vec_to_params[leaf_vector] = (leaf_vector.means[0], leaf_vector.sigma[0])
             else:
                 vec_to_params[leaf_vector] = leaf_vector.probs[0]
         for layer_idx in range(1, len(self.vector_list)):
@@ -547,6 +679,12 @@ class RatSpn(object):
                         bernoulli = para.Bernoulli(p=normalized_p, scope=[r])
                         bernoulli.id = node_id = node_id + 1
                         prod.children.append(bernoulli)
+                    elif self.args.leaf == "gaussian":
+                        means, sigmas = vec_to_params[leaf_vector]
+                        stdevs = np.sqrt(sigmas) + np.zeros_like(means)  # Use broadcasting to expand stdev is necessary
+                        gaussian = para.Gaussian(mean=means[j, i], stdev=stdevs[j, i], scope=[r])
+                        gaussian.id = node_id = node_id + 1
+                        prod.children.append(gaussian)
                     else:
                         means, sigmas = vec_to_params[leaf_vector]
                         stdevs = np.sqrt(sigmas) + np.zeros_like(means)  # Use broadcasting to expand stdev is necessary

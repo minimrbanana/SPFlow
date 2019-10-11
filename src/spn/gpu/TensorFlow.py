@@ -71,11 +71,13 @@ def add_tf_graph_to_node(node_type, lambda_func):
 
 
 def spn_to_tf_graph(node, data, batch_size=None, node_tf_graph=_node_log_tf_graph, log_space=True, dtype=None):
-    tf.reset_default_graph()
+    # tf.reset_default_graph()
+    # in NN + WSPN case, input data will be a tensor from NN
     if not dtype:
         dtype = data.dtype
     # data is a placeholder, with shape same as numpy data
-    data_placeholder = tf.placeholder(data.dtype, (batch_size, data.shape[1]))
+    # data_placeholder = tf.placeholder(data.dtype, (batch_size, data.shape[1]))
+    data_placeholder = data
     variable_dict = {}
     tf_graph = eval_spn_bottom_up(
         node,
@@ -129,7 +131,7 @@ def optimize_tf(
     spn_copy = Copy(spn)
 
     # Compile the SPN to a static tensorflow graph
-    tf_graph, data_placeholder, variable_dict = spn_to_tf_graph(spn_copy, data, batch_size)
+    tf_graph, data_placeholder, variable_dict = spn_to_tf_graph(spn_copy, data, batch_size, dtype=np.float32)
 
     # Optimize the tensorflow graph
     loss_list = optimize_tf_graph(

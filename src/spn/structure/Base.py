@@ -134,7 +134,7 @@ class Context:
         return [self.parametric_types[s] for s in scopes]
 
     def add_domains(self, data):
-        assert len(data.shape) == 2, "data is not 2D?"
+        assert len(data.shape) == 2 or len(data.shape) == 3, "data is not 2D?"
         assert data.shape[1] == len(self.meta_types), "Data columns and metatype size doesn't match"
 
         from spn.structure.StatisticalTypes import MetaType
@@ -380,7 +380,10 @@ def eval_spn_bottom_up(node, eval_functions, all_results=None, debug=False, **ar
     tmp_children_list = []
     len_tmp_children_list = 0
     for n in nodes:
-
+        ## added by zhongjie
+        # print('processing', n, ' of ', len(nodes))
+        import time
+        ss_time = time.time()
         try:
             func = n.__class__._eval_func[-1]
             n_is_leaf = n.__class__._is_leaf
@@ -404,6 +407,8 @@ def eval_spn_bottom_up(node, eval_functions, all_results=None, debug=False, **ar
             result = func(n, tmp_children_list[0:len_children], **args)
 
         all_results[n] = result
+        ee_time = time.time()
+        # print('time taken:', ee_time - ss_time, 'seconds')
 
     for node_type, func in eval_functions.items():
         del node_type._eval_func[-1]

@@ -51,7 +51,7 @@ class Histogram(Leaf):
         )
 
 
-def create_histogram_leaf(data, ds_context, scope, alpha=1.0, hist_source="numpy"):
+def create_histogram_leaf(data, ds_context, scope, alpha=0.001, hist_source="numpy"):
     assert len(scope) == 1, "scope of univariate histogram for more than one variable?"
     assert data.shape[1] == 1, "data has more than one feature?"
 
