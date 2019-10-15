@@ -19,7 +19,7 @@ logging.basicConfig(filename='/media/yu/data/yu/code/gp_whittle/WhittleNetwork/d
 logger = logging.getLogger(__name__)
 
 
-def learn_whittle_spn_1d(train_data, n_RV, n_min_slice=2000):
+def learn_whittle_spn_1d(train_data, n_RV, n_min_slice=2000, init_scope=None):
     from spn.structure.Base import Context
     from spn.structure.leaves.parametric.Parametric import Gaussian
     from spn.algorithms.LearningWrappers import learn_parametric
@@ -28,7 +28,8 @@ def learn_whittle_spn_1d(train_data, n_RV, n_min_slice=2000):
 
     print('learning WSPN')
     # l_rfft=None --> 1d gaussian node, is_pair does not work
-    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, cpus=4, l_rfft=None, is_pair=False)
+    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, initial_scope=init_scope,
+                            cpus=4, l_rfft=None, is_pair=False)
     if ARGS.data_type==1:
         save_path = './dev/sine/wspn1d_'+str(n_min_slice)+'/'
     else:
@@ -55,7 +56,7 @@ def load_whittle_spn_1d(n_min_slice):
     return spn
 
 
-def learn_whittle_spn_2d(train_data, n_RV, n_min_slice):
+def learn_whittle_spn_2d(train_data, n_RV, n_min_slice, init_scope=None):
 
     from spn.structure.Base import Context
     from spn.structure.leaves.parametric.Parametric import MultivariateGaussian
@@ -74,7 +75,8 @@ def learn_whittle_spn_2d(train_data, n_RV, n_min_slice):
     else:
         l_rfft = 8
     # l_rfft!=None --> 2d/pair gaussian node, is_pair=False --> 2d gaussian, diagonal covariance matrix
-    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, cpus=4, l_rfft=l_rfft, is_pair=False)
+    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, initial_scope=init_scope,
+                            cpus=4, l_rfft=l_rfft, is_pair=False)
     if ARGS.data_type==1:
         save_path = './dev/sine/wspn2d_'+str(n_min_slice)+'/'
     else:
@@ -101,7 +103,7 @@ def load_whittle_spn_2d(n_min_slice):
     return spn
 
 
-def learn_whittle_spn_pair(train_data, n_RV, n_min_slice):
+def learn_whittle_spn_pair(train_data, n_RV, n_min_slice, init_scope=None):
 
     from spn.structure.Base import Context
     from spn.structure.leaves.parametric.Parametric import MultivariateGaussian
@@ -120,7 +122,8 @@ def learn_whittle_spn_pair(train_data, n_RV, n_min_slice):
     else:
         l_rfft = 8
     # l_rfft!=None --> 2d/pair gaussian node, is_pair=True --> pairwise gaussian, full covariance matrix
-    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, cpus=4, l_rfft=l_rfft, is_pair=True)
+    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, initial_scope=init_scope,
+                            cpus=4, l_rfft=l_rfft, is_pair=True)
     if ARGS.data_type==1:
         save_path = './dev/sine/wspn_pair_'+str(n_min_slice)+'/'
     else:
@@ -170,13 +173,13 @@ if __name__ == '__main__':
     # set parameters
     parser = argparse.ArgumentParser()
     # Args go here
-    parser.add_argument('--wspn_type', type=int, default=2,
-                        help='Type of wspn, 1-1d, 2-2d')
+    parser.add_argument('--wspn_type', type=int, default=3,
+                        help='Type of wspn, 1-1d, 2-2d, 3-pair')
     parser.add_argument('--train_type', type=int, default=1,
                         help='Type of train, 1-train, 2-test')
-    parser.add_argument('--n_min_slice', type=int, default=1500,
+    parser.add_argument('--n_min_slice', type=int, default=2100,
                         help='minimum size of slice.')
-    parser.add_argument('--data_type', type=int, default=1,
+    parser.add_argument('--data_type', type=int, default=2,
                         help='Type of data, 1-sine, 2-mnist')
 
     ARGS, unparsed = parser.parse_known_args()
@@ -195,6 +198,10 @@ if __name__ == '__main__':
         n_RV = 204  # number of RVs
         p = 6  # dim
         L = 32  # TS length
+        scope_list = np.arange(n_RV)
+        scope_temp = np.delete(scope_list, np.where(scope_list % 34 == 17))
+        init_scope = list(np.delete(scope_temp, np.where(scope_temp % 34 == 33)))
+        # init_scope = np.delete(scope_list, np.where(scope_list % 34 == 33))
     elif ARGS.data_type==2:
         print('loading mnist data')
         data_train = np.fromfile('/media/yu/data/yu/code/gp_whittle/WhittleNetwork/train_mnist.dat',
@@ -206,6 +213,10 @@ if __name__ == '__main__':
         n_RV = 224  # number of RVs
         p = 14  # dim
         L = 14  # TS length
+        scope_list = np.arange(n_RV)
+        scope_temp = np.delete(scope_list, np.where(scope_list % 16 == 8))
+        init_scope = list(np.delete(scope_temp, np.where(scope_temp % 16 == 15)))
+        # data_train = data_train[0:100, :]
     else:
         sys.exit()
     print('data done')
@@ -214,7 +225,7 @@ if __name__ == '__main__':
         # train/load wspn 1d
         n_min_slice = ARGS.n_min_slice
         if ARGS.train_type==1:
-            wspn = learn_whittle_spn_1d(data_train, n_RV, n_min_slice)
+            wspn = learn_whittle_spn_1d(data_train, n_RV, n_min_slice, init_scope)
         elif ARGS.train_type==2:
             wspn = load_whittle_spn_1d(n_min_slice)
             #f = open('./big_mixture_spn_yu_sine_EM_optimized_70_EM_iter', 'rb')
@@ -234,7 +245,7 @@ if __name__ == '__main__':
         if ARGS.train_type == 1:
             # data_train = data_train[0:1000, 0:34]
             # n_RV = 34
-            wspn = learn_whittle_spn_2d(data_train, n_RV, n_min_slice)
+            wspn = learn_whittle_spn_2d(data_train, n_RV, n_min_slice, init_scope)
         elif ARGS.train_type==2:
             wspn = load_whittle_spn_2d(n_min_slice)
             # calculate LL
@@ -251,7 +262,7 @@ if __name__ == '__main__':
         if ARGS.train_type == 1:
             # data_train = data_train[0:1000, 0:34]
             # n_RV = 34
-            wspn = learn_whittle_spn_pair(data_train, n_RV, n_min_slice)
+            wspn = learn_whittle_spn_pair(data_train, n_RV, n_min_slice, init_scope)
         elif ARGS.train_type==2:
             wspn = load_whittle_spn_pair(n_min_slice)
             # calculate LL

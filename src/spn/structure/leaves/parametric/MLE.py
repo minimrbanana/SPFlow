@@ -30,11 +30,14 @@ def update_parametric_parameters_mle(node, data):
 
     if isinstance(node, MultivariateGaussian):
         node.mean = np.mean(data, axis=0).tolist()
-        node.sigma = np.cov(data, rowvar=0).tolist()
+        node.sigma = np.cov(data, rowvar=False).tolist()
 
-        # add by zhongjie on 06.10.2019
+        # add by zhongjie on 06.10.2019, the square of stdev
+        if isinstance(node.sigma, float):
+            if np.isnan(node.sigma):
+                print('nan!')
         if len(node.mean)==1 and np.isclose(node.sigma, 0):
-            node.sigma = 0.00000001
+            node.sigma = 0.000000001
         return
 
     assert data.shape[1] == 1
@@ -46,7 +49,7 @@ def update_parametric_parameters_mle(node, data):
         node.stdev = np.std(data).item()
 
         if np.isclose(node.stdev, 0):
-            node.stdev = 0.00000001
+            node.stdev = 0.00001
 
     elif isinstance(node, Gamma):
         # default

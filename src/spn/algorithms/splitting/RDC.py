@@ -297,8 +297,7 @@ def getIndependentRDCGroups_py(
     #
     # Add function to keep correlation between real and imag coefficients.
     # rdc_adjacency_matrix = keepComplexPairs(rdc_adjacency_matrix, scope)
-    if is_pair:
-        assert(l_rfft is not None)
+    if l_rfft is not None:
         for s_real in scope:
             # select scope that belongs to the REAL part.
             if l_rfft-1 > s_real % (l_rfft * 2) > 0:
@@ -307,7 +306,7 @@ def getIndependentRDCGroups_py(
                 index_imag = scope.index(s_real+l_rfft)
                 rdc_adjacency_matrix[index_real, index_imag] = 1
                 rdc_adjacency_matrix[index_imag, index_real] = 1
-        rdc_adjacency_matrix[rdc_adjacency_matrix < 0.84] = 0
+        rdc_adjacency_matrix[rdc_adjacency_matrix < 0.3] = 0
         # rdc_adjacency_matrix[rdc_adjacency_matrix < threshold] = 0
     #
 

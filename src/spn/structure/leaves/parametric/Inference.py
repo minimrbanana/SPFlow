@@ -28,7 +28,7 @@ def continuous_multivariate_likelihood(node, data=None, dtype=np.float64):
     observations = data[:, node.scope]
     assert not np.any(np.isnan(data))
     scipy_obj, params = get_scipy_obj_params(node)
-    probs[:, 0] = scipy_obj.pdf(observations, **params)
+    probs[:, 0] = scipy_obj.pdf(observations, allow_singular=True, **params)
     return probs
 
 
