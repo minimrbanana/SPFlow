@@ -306,7 +306,7 @@ def getIndependentRDCGroups_py(
                 index_imag = scope.index(s_real+l_rfft)
                 rdc_adjacency_matrix[index_real, index_imag] = 1
                 rdc_adjacency_matrix[index_imag, index_real] = 1
-        rdc_adjacency_matrix[rdc_adjacency_matrix < 0.3] = 0
+        rdc_adjacency_matrix[rdc_adjacency_matrix < threshold] = 0
         # rdc_adjacency_matrix[rdc_adjacency_matrix < threshold] = 0
     #
 

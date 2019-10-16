@@ -28,8 +28,8 @@ def learn_whittle_spn_1d(train_data, n_RV, n_min_slice=2000, init_scope=None):
 
     print('learning WSPN')
     # l_rfft=None --> 1d gaussian node, is_pair does not work
-    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, initial_scope=init_scope,
-                            cpus=4, l_rfft=None, is_pair=False)
+    wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, threshold=0.4,
+                            initial_scope=init_scope, cpus=4, l_rfft=None, is_pair=False)
     if ARGS.data_type==1:
         save_path = './dev/sine/wspn1d_'+str(n_min_slice)+'/'
     else:
@@ -173,7 +173,7 @@ if __name__ == '__main__':
     # set parameters
     parser = argparse.ArgumentParser()
     # Args go here
-    parser.add_argument('--wspn_type', type=int, default=3,
+    parser.add_argument('--wspn_type', type=int, default=1,
                         help='Type of wspn, 1-1d, 2-2d, 3-pair')
     parser.add_argument('--train_type', type=int, default=1,
                         help='Type of train, 1-train, 2-test')
@@ -181,6 +181,8 @@ if __name__ == '__main__':
                         help='minimum size of slice.')
     parser.add_argument('--data_type', type=int, default=2,
                         help='Type of data, 1-sine, 2-mnist')
+    parser.add_argument('--threshold', type=float, default=0.3,
+                        help='Threshold of splitting features')
 
     ARGS, unparsed = parser.parse_known_args()
 
