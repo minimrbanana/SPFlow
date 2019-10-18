@@ -36,8 +36,23 @@ def update_parametric_parameters_mle(node, data):
         if isinstance(node.sigma, float):
             if np.isnan(node.sigma):
                 print('nan!')
-        if len(node.mean)==1 and np.isclose(node.sigma, 0):
+        # check if 0 in cov
+        if len(node.mean) == 1 and np.isclose(node.sigma, 0):
+            # 1d
             node.sigma = 0.000000001
+        elif len(node.mean) == 2:
+            # 2d, make it PSD
+            arr_cov = np.array(node.sigma)
+            if np.isclose(arr_cov[0][0], 0):
+                # node.sigma[0][0] = 0.00000001
+                node.sigma[0][0] = 0.159154943
+                node.sigma[0][1] = 0.0
+                node.sigma[1][0] = 0.0
+            if np.isclose(arr_cov[1][1], 0):
+                # node.sigma[1][1] = 0.00000001
+                node.sigma[1][1] = 0.159154943
+                node.sigma[0][1] = 0.0
+                node.sigma[1][0] = 0.0
         return
 
     assert data.shape[1] == 1
@@ -49,7 +64,8 @@ def update_parametric_parameters_mle(node, data):
         node.stdev = np.std(data).item()
 
         if np.isclose(node.stdev, 0):
-            node.stdev = 0.00001
+            # node.stdev = 0.0001
+            node.stdev = 0.39894228
 
     elif isinstance(node, Gamma):
         # default
