@@ -286,6 +286,9 @@ def learn_structure(
                 result_nodes = pool.starmap(create_leaf, local_children_params)
             # 2. if is_pair=True and #scope>1, the factorization ends with pairs of coefs
             else:
+                if local_data.shape[0]==1:
+                    # to avoid single instance? by zhongjie
+                    local_data = np.concatenate([local_data, local_data], axis=0)
                 for col in range(len(scope)):
                     # consider only the real part of coef
                     if l_rfft-1 > scope[col] % (l_rfft * 2) > 0:
