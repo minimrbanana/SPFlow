@@ -36,20 +36,24 @@ def update_parametric_parameters_mle(node, data):
         # check if 0 in cov
         if len(node.mean) == 1:
             # two cases in 1d: sigma=0 (all samples are the same) or sigma=nan (only one sample in data slice)
-            if np.isclose(node.sigma, 0) or np.isnan(node.sigma):
+            if node.sigma < 0.00000001 or np.isnan(node.sigma):
+            # if np.isclose(node.sigma, 0) or np.isnan(node.sigma):
                 # 1d
-                node.sigma = 0.000000001
+                node.sigma = 0.00000001
+                # node.sigma = 0.159154943
         elif len(node.mean) == 2:
             # 2d, make it PSD
             arr_cov = np.array(node.sigma)
-            if np.isclose(arr_cov[0][0], 0, atol=1e-16):
+            if arr_cov[0][0] < 0.00000001:
+            # if np.isclose(arr_cov[0][0], 0, atol=1e-16):
                 node.sigma[0][0] = 0.00000001
                 # node.sigma[0][0] = 0.159154943
                 node.sigma[0][1] = 0.0
                 node.sigma[1][0] = 0.0
                 print('changing stdev!')
                 # sys.exit()
-            if np.isclose(arr_cov[1][1], 0, atol=1e-16):
+            if arr_cov[1][1] < 0.00000001:
+            # if np.isclose(arr_cov[1][1], 0, atol=1e-16):
                 node.sigma[1][1] = 0.00000001
                 # node.sigma[1][1] = 0.159154943
                 node.sigma[0][1] = 0.0
@@ -69,7 +73,8 @@ def update_parametric_parameters_mle(node, data):
         node.mean = np.mean(data).item()
         node.stdev = np.std(data).item()
 
-        if np.isclose(node.stdev, 0):
+        if node.stdev < 0.0001:
+        # if np.isclose(node.stdev, 0):
             node.stdev = 0.0001
             print('changing stdev!')
             # sys.exit()
