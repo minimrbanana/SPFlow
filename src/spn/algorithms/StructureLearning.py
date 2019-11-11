@@ -274,7 +274,8 @@ def learn_structure(
             local_children_params = []
             split_start_t = perf_counter()
             # modified by zhongjie on 04.10.2019
-            # 1. if is_pair=False or #scope=1, the factorization ends with univariate Gaussian
+            # 1. if is_pair==False --> no Multi Variate Gaussian here, use Univariate Gaussian to model all RVs
+            #    or if scope=1, the factorization ends with univariate Gaussian
             if not is_pair or len(scope)==1:
                 for col in range(len(scope)):
                     node.children.append(None)
@@ -284,20 +285,21 @@ def learn_structure(
                     local_children_params.append((child_data_slice, ds_context, [scope[col]]))
 
                 result_nodes = pool.starmap(create_leaf, local_children_params)
-            # 2. if is_pair=True and #scope>1, the factorization ends with pairs of coefs
+            # 2. if is_pair=True and #scope>1, Multi Variate Gaussian leaf will be created
+            #    the factorization ends with pairs of coefs
             else:
                 if local_data.shape[0]==1:
-                    # to avoid single instance? by zhongjie
+                    # trick, to avoid single instance? by zhongjie
                     local_data = np.concatenate([local_data, local_data], axis=0)
                 for col in range(len(scope)):
-                    # consider only the real part of coef
+                    # if it is not freq 0 or freq \Pi, consider first only the real part of coef
                     if l_rfft-1 > scope[col] % (l_rfft * 2) > 0:
                         node.children.append(None)
                         local_tasks.append(len(node.children) - 1)
-                        # pair of coefs
+                        # then find corresponding imag coefs --> scope[real]+l_rfft
                         child_data_slice = data_slicer(local_data, [col, scope.index(scope[col]+l_rfft)], num_conditional_cols)
                         local_children_params.append((child_data_slice, ds_context, [scope[col], scope[col]+l_rfft]))
-                    # if it is freq 0 or freq \pi, which has no imag part
+                    # if it is freq 0 or freq \pi, which has no imag part, do normally
                     elif scope[col] % (l_rfft * 2)==0 or scope[col] % (l_rfft * 2)==l_rfft-1:
                         node.children.append(None)
                         # tasks.append((data_slicer(local_data, [col], num_conditional_cols), node, len(node.children) - 1, [scope[col]], True, True))

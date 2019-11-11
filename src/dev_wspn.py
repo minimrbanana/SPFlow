@@ -79,7 +79,7 @@ def learn_whittle_spn_1d(train_data, n_RV, n_min_slice=2000, init_scope=None):
     print('learning WSPN')
     # l_rfft=None --> 1d gaussian node, is_pair does not work
     wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, threshold=ARGS.threshold,
-                            initial_scope=init_scope, cpus=4, l_rfft=None, is_pair=False)
+                            initial_scope=init_scope, cpus=1, l_rfft=None, is_pair=False)
     save_path = get_save_path(ARGS)
     check_path(save_path)
     f = open(save_path + 'wspn_1d.pkl', 'wb')
@@ -114,7 +114,7 @@ def learn_whittle_spn_2d(train_data, n_RV, n_min_slice, init_scope=None):
     l_rfft = get_l_rfft(ARGS)
     # l_rfft!=None --> 2d/pair gaussian node, is_pair=False --> 2d gaussian, diagonal covariance matrix
     wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, threshold=ARGS.threshold,
-                            initial_scope=init_scope, cpus=4, l_rfft=l_rfft, is_pair=False)
+                            initial_scope=init_scope, cpus=1, l_rfft=l_rfft, is_pair=False)
     save_path = get_save_path(ARGS)
     check_path(save_path)
     f = open(save_path+'wspn_2d.pkl', 'wb')
@@ -124,7 +124,7 @@ def learn_whittle_spn_2d(train_data, n_RV, n_min_slice, init_scope=None):
     return wspn
 
 
-def load_whittle_spn_2d(ARGS):
+def load_whittle_spn_2d(ARGS, log=True):
     save_path = get_save_path(ARGS)
     f = open(save_path+'wspn_2d.pkl', 'rb')
     spn = pickle.load(f)
@@ -132,7 +132,8 @@ def load_whittle_spn_2d(ARGS):
 
     log_msg = get_structure_stats(spn)
     print(log_msg)
-    logger.info(log_msg)
+    if log:
+        logger.info(log_msg)
 
     return spn
 
@@ -150,7 +151,7 @@ def learn_whittle_spn_pair(train_data, n_RV, n_min_slice, init_scope=None):
     l_rfft = get_l_rfft(ARGS)
     # l_rfft!=None --> 2d/pair gaussian node, is_pair=True --> pairwise gaussian, full covariance matrix
     wspn = learn_parametric(train_data, ds_context, min_instances_slice=n_min_slice, threshold=ARGS.threshold,
-                            initial_scope=init_scope, cpus=4, l_rfft=l_rfft, is_pair=True)
+                            initial_scope=init_scope, cpus=1, l_rfft=l_rfft, is_pair=True)
     save_path = get_save_path(ARGS)
     check_path(save_path)
     f = open(save_path+'wspn_pair.pkl', 'wb')
@@ -160,7 +161,7 @@ def learn_whittle_spn_pair(train_data, n_RV, n_min_slice, init_scope=None):
     return wspn
 
 
-def load_whittle_spn_pair(ARGS):
+def load_whittle_spn_pair(ARGS, log=True):
     save_path = get_save_path(ARGS)
     f = open(save_path+'wspn_pair.pkl', 'rb')
     spn = pickle.load(f)
@@ -168,7 +169,8 @@ def load_whittle_spn_pair(ARGS):
 
     log_msg = get_structure_stats(spn)
     print(log_msg)
-    logger.info(log_msg)
+    if log:
+        logger.info(log_msg)
 
     return spn
 
@@ -179,7 +181,7 @@ def load_whittle_spn_res(ARGS):
     print(log_msg)
     logger.info(log_msg)
 
-    rspn_path = 'ventola/em_optimized_fuse_spn_yu_mnist'
+    rspn_path = 'ventola/em_optimized_fuse_spn_yu_sine'
     f = open(rspn_path, 'rb')
     rspn = pickle.load(f)
     f.close()
@@ -327,8 +329,6 @@ def load_data_for_wspn(ARGS):
         print('input data error')
         sys.exit()
     print('data done')
-    logger.info(log_msg)
-    logger.info('data done')
     return data_train, data_pos, data_neg, n_RV, p, L, init_scope
 
 
@@ -397,7 +397,7 @@ if __name__ == '__main__':
     # set parameters
     parser = argparse.ArgumentParser()
     # Args go here
-    parser.add_argument('--wspn_type', type=int, default=1,
+    parser.add_argument('--wspn_type', type=int, default=3,
                         help='Type of wspn, 1-1d, 2-2d, 3-pair, 4-res-spn')
     parser.add_argument('--train_type', type=int, default=1,
                         help='Type of train, 1-train, 2-test')
@@ -477,9 +477,12 @@ if __name__ == '__main__':
             log_msg = 'Test Res-SPN'
             logger.info(log_msg)
             wspn = load_whittle_spn_res(ARGS)
+            # modify data for res-spn
+            data_train = data_train[:, init_scope]
+            data_pos = data_pos[:, init_scope]
+            data_neg = data_neg[:, init_scope]
             # calculate LL
             calc_ll(wspn, data_train, data_pos, data_neg)
-
 
     log_msg = 'Running time: ' + str((time.time() - start_time)/60.0) + 'minutes'
     logger.info(log_msg)
