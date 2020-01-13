@@ -154,7 +154,7 @@ def learn_parametric(
     initial_scope=None,
     cpus=-1,
     l_rfft=None,
-    is_pair=False,
+    is_2d=False,
 ):
     if leaves is None:
         leaves = create_parametric_leaf
@@ -162,17 +162,17 @@ def learn_parametric(
     if rand_gen is None:
         rand_gen = np.random.RandomState(17)
 
-    def learn_param(data, ds_context, cols, rows, min_instances_slice, threshold, ohe, initial_scope, l_rfft, is_pair):
+    def learn_param(data, ds_context, cols, rows, min_instances_slice, threshold, ohe, initial_scope, l_rfft, is_2d):
         split_cols, split_rows = get_splitting_functions(cols, rows, ohe, threshold, rand_gen, cpus)
 
         nextop = get_next_operation(min_instances_slice, min_features_slice, multivariate_leaf)
 
-        return learn_structure(data, ds_context, split_rows, split_cols, leaves, nextop, initial_scope, l_rfft=l_rfft, is_pair=is_pair)
+        return learn_structure(data, ds_context, split_rows, split_cols, leaves, nextop, initial_scope, l_rfft=l_rfft, is_2d=is_2d)
 
     if memory:
         learn_param = memory.cache(learn_param)
 
-    return learn_param(data, ds_context, cols, rows, min_instances_slice, threshold, ohe, initial_scope, l_rfft, is_pair)
+    return learn_param(data, ds_context, cols, rows, min_instances_slice, threshold, ohe, initial_scope, l_rfft, is_2d)
 
 
 def learn_cnet(

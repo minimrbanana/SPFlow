@@ -124,7 +124,7 @@ def learn_structure(
     num_conditional_cols=None,
     data_slicer=default_slicer,
     l_rfft=None,
-    is_pair=False,
+    is_2d=False,
 ):
     assert dataset is not None
     assert ds_context is not None
@@ -241,7 +241,7 @@ def learn_structure(
 
         elif operation == Operation.SPLIT_COLUMNS:
             split_start_t = perf_counter()
-            data_slices = split_cols(local_data, ds_context, scope, l_rfft, is_pair)
+            data_slices = split_cols(local_data, ds_context, scope, l_rfft, is_2d)
             split_end_t = perf_counter()
             logging.debug(
                 "\t\tfound {} col clusters (in {:.5f} secs)".format(len(data_slices), split_end_t - split_start_t)
@@ -274,9 +274,9 @@ def learn_structure(
             local_children_params = []
             split_start_t = perf_counter()
             # modified by zhongjie on 04.10.2019
-            # 1. if is_pair==False --> no Multi Variate Gaussian here, use Univariate Gaussian to model all RVs
+            # 1. if is_2d==False --> no Multi Variate Gaussian here, use Univariate Gaussian to model all RVs
             #    or if scope=1, the factorization ends with univariate Gaussian
-            if not is_pair or len(scope)==1:
+            if not is_2d or len(scope)==1:
                 for col in range(len(scope)):
                     node.children.append(None)
                     # tasks.append((data_slicer(local_data, [col], num_conditional_cols), node, len(node.children) - 1, [scope[col]], True, True))
@@ -285,7 +285,7 @@ def learn_structure(
                     local_children_params.append((child_data_slice, ds_context, [scope[col]]))
 
                 result_nodes = pool.starmap(create_leaf, local_children_params)
-            # 2. if is_pair=True and #scope>1, Multi Variate Gaussian leaf will be created
+            # 2. if is_2d=True and #scope>1, Multi Variate Gaussian leaf will be created
             #    the factorization ends with pairs of coefs
             else:
                 if local_data.shape[0]==1:

@@ -50,7 +50,7 @@ def update_parametric_parameters_mle(node, data):
                 # node.sigma[0][0] = 0.159154943
                 node.sigma[0][1] = 0.0
                 node.sigma[1][0] = 0.0
-                print('changing stdev!')
+                print('changing variance!')
                 # sys.exit()
             if arr_cov[1][1] < 0.00000001:
             # if np.isclose(arr_cov[1][1], 0, atol=1e-16):
@@ -58,7 +58,7 @@ def update_parametric_parameters_mle(node, data):
                 # node.sigma[1][1] = 0.159154943
                 node.sigma[0][1] = 0.0
                 node.sigma[1][0] = 0.0
-                print('changing stdev!')
+                print('changing variance!')
                 # sys.exit()
         if isinstance(node.sigma, float):
             if np.isnan(node.sigma):

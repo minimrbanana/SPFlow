@@ -297,6 +297,11 @@ def getIndependentRDCGroups_py(
     #
     # Add function to keep correlation between real and imag coefficients.
     # rdc_adjacency_matrix = keepComplexPairs(rdc_adjacency_matrix, scope)
+    """
+    Additional comments:
+    we can do splitting based on real coefs only, 
+    in order to achieve that, all the correlations between imag-real and imag-imag can be set to 0,
+    """
     if l_rfft is not None:
         for s_real in scope:
             # select scope that belongs to the REAL part.
